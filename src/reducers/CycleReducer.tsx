@@ -1,3 +1,4 @@
+import { produce } from 'immer'
 import { Cycle } from '../@types/Cycle'
 
 type NewCycle = {
@@ -26,42 +27,40 @@ export interface StateCycleType {
   cycles: Cycle[]
   currentCycleId: string | null
 }
-export const setCycles = (
-  stateCycle: StateCycleType,
-  action: ListAction,
-): StateCycleType => {
-  const prevState = { ...stateCycle }
-  switch (action.type) {
-    case 'ADD_CYCLE':
-      return {
-        cycles: [...prevState.cycles, action.payload.cycle],
-        currentCycleId: action.payload.cycle.id,
-      }
 
-    case 'INTERRUPT_CYCLE':
-      return {
-        cycles: prevState.cycles.map((cycle) => {
+export const setCycles = produce(
+  (draft: StateCycleType, action: ListAction) => {
+    switch (action.type) {
+      case 'ADD_CYCLE':
+        draft.cycles.push(action.payload.cycle)
+        draft.currentCycleId = action.payload.cycle.id
+        break
+      case 'INTERRUPT_CYCLE':
+        draft.cycles.forEach((cycle) => {
           if (cycle.id === action.payload.cycleId) {
-            return { ...cycle, interruptedDate: new Date() }
-          } else {
-            return cycle
+            cycle.interruptedDate = new Date()
+            draft.currentCycleId = null
           }
-        }),
-        currentCycleId: null,
-      }
+        })
+        break
+      case 'FINISHE_CYCLE':
+        draft.cycles.forEach((cycle) => {
+          if (cycle.id === action.payload.cycleId) {
+            cycle.finishedDate = new Date()
+            draft.currentCycleId = null
+          }
+        })
+        break
+      default:
+        break
+    }
+  },
+)
+/* ao chamar produce(), passamos uma função como referência, a qual contém a lógica do reducer. Sendo seu primeiro parametro o state e o segundo a action. Ao usar o dispatch do reducer, invocaremos ela. */
+/* em tese:
+- chame produce com uma função anônima a qual contém a lógica do reducer. Dentro dela altere os valores de estado
+não mais usando o conceito de imutabilidade.
+- Quanto ao demais, continue usando o dispatch (etc) de igual modo.
 
-    case 'FINISHE_CYCLE':
-      return {
-        cycles: prevState.cycles.map((cycle) => {
-          if (cycle.id === action.payload.cycleId) {
-            return { ...cycle, finishedDate: new Date() }
-          } else {
-            return cycle
-          }
-        }),
-        currentCycleId: null,
-      }
-    default:
-      return { ...stateCycle }
-  }
-}
+- Deduzo que uma boa explica seria que: produce retorna uma callback com toda a lógica de imutabilidade (convertida já), com base na callback passada como parametro na invocação (produce).
+*/
